@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/qiniu/api/auth/digest"
+	"github.com/qiniu/api/conf"
 	fio "github.com/qiniu/api/io"
 	rio "github.com/qiniu/api/resumable/io"
 	"github.com/qiniu/api/rs"
@@ -25,16 +26,18 @@ import (
 Config file like:
 
 {
+	"up_host"		:	"http://upload.qiniu.com",
 	"src_dir" 		:	"/Users/jemy/Photos",
 	"access_key" 	:	"<Your AccessKey>",
 	"secret_key"	:	"<Your SecretKey>",
 	"bucket"		:	"test-bucket",
 	"ignore_dir"	:	false,
 	"key_prefix"	:	"2014/12/01/",
-	"overwrite"		:	false
+	"overwrite"		:	false,
+	"check_exists"	:	true
 }
 
-or without key_prefix and ignore_dir
+or without up_host and key_prefix and ignore_dir and check_exists
 
 {
 	"src_dir" 		:	"/Users/jemy/Photos",
@@ -51,13 +54,20 @@ const (
 )
 
 type UploadConfig struct {
-	SrcDir    string `json:"src_dir"`
-	AccessKey string `json:"access_key"`
-	SecretKey string `json:"secret_key"`
-	Bucket    string `json:"bucket"`
-	KeyPrefix string `json:"key_prefix,omitempty"`
-	IgnoreDir bool   `json:"ignore_dir,omitempty"`
-	Overwrite bool   `json:"overwrite,omitempty"`
+	SrcDir      string `json:"src_dir"`
+	AccessKey   string `json:"access_key"`
+	SecretKey   string `json:"secret_key"`
+	Bucket      string `json:"bucket"`
+	UpHost      string `json:"up_host,omitempty"`
+	KeyPrefix   string `json:"key_prefix,omitempty"`
+	IgnoreDir   bool   `json:"ignore_dir,omitempty"`
+	Overwrite   bool   `json:"overwrite,omitempty"`
+	CheckExists bool   `json:"check_exists,omitempty"`
+}
+
+var upSettings = rio.Settings{
+	ChunkSize: 4 * 1024 * 1024,
+	TryTimes:  5,
 }
 
 func QiniuUpload(threadCount int, uploadConfigFile string) {
@@ -88,15 +98,16 @@ func QiniuUpload(threadCount int, uploadConfigFile string) {
 		log.Error("Failed to get current user", err)
 		return
 	}
+	pathSep := string(os.PathSeparator)
 	jobId := base64.URLEncoding.EncodeToString([]byte(uploadConfig.SrcDir + ":" + uploadConfig.Bucket))
-	storePath := fmt.Sprintf("%s/.qshell/qupload/%s", currentUser.HomeDir, jobId)
+	storePath := fmt.Sprintf("%s%s.qshell%squpload%s%s", currentUser.HomeDir, pathSep, pathSep, pathSep, jobId)
 	err = os.MkdirAll(storePath, 0775)
 	if err != nil {
 		log.Error(fmt.Sprintf("Failed to mkdir `%s' due to `%s'", storePath, err))
 		return
 	}
-	cacheFileName := fmt.Sprintf("%s/%s.cache", storePath, jobId)
-	leveldbFileName := fmt.Sprintf("%s/%s.ldb", storePath, jobId)
+	cacheFileName := fmt.Sprintf("%s%s%s.cache", storePath, pathSep, jobId)
+	leveldbFileName := fmt.Sprintf("%s%s%s.ldb", storePath, pathSep, jobId)
 	totalFileCount := dirCache.Cache(uploadConfig.SrcDir, cacheFileName)
 	ldb, err := leveldb.OpenFile(leveldbFileName, nil)
 	if err != nil {
@@ -122,6 +133,12 @@ func QiniuUpload(threadCount int, uploadConfigFile string) {
 	upCounter := 0
 	threadThreshold := threadCount + 1
 
+	//use host if not empty
+	if uploadConfig.UpHost != "" {
+		conf.UP_HOST = uploadConfig.UpHost
+	}
+	//set settings
+	rio.SetSettings(&upSettings)
 	mac := digest.Mac{uploadConfig.AccessKey, []byte(uploadConfig.SecretKey)}
 	//check thread count
 	for bScanner.Scan() {
@@ -132,7 +149,7 @@ func QiniuUpload(threadCount int, uploadConfigFile string) {
 			cacheFlmd, _ := strconv.Atoi(items[2])
 			uploadFileKey := cacheFname
 			if uploadConfig.IgnoreDir {
-				if i := strings.LastIndex(uploadFileKey, string(os.PathSeparator)); i != -1 {
+				if i := strings.LastIndex(uploadFileKey, pathSep); i != -1 {
 					uploadFileKey = uploadFileKey[i+1:]
 				}
 			}
@@ -143,7 +160,7 @@ func QiniuUpload(threadCount int, uploadConfigFile string) {
 			if runtime.GOOS == "windows" {
 				uploadFileKey = strings.Replace(uploadFileKey, "\\", "/", -1)
 			}
-			cacheFilePath := strings.Join([]string{uploadConfig.SrcDir, cacheFname}, string(os.PathSeparator))
+			cacheFilePath := strings.Join([]string{uploadConfig.SrcDir, cacheFname}, pathSep)
 			fstat, err := os.Stat(cacheFilePath)
 			if err != nil {
 				log.Error(fmt.Sprintf("Error stat local file `%s' due to `%s'", cacheFilePath, err))
@@ -164,9 +181,10 @@ func QiniuUpload(threadCount int, uploadConfigFile string) {
 			}
 
 			fmt.Print("\033[2K\r")
-			fmt.Printf("Uploading %s (%d/%d, %.0f%%) ...", ldbKey, currentFileCount, totalFileCount,
+			fmt.Printf("Uploading %s (%d/%d, %.1f%%) ...", ldbKey, currentFileCount, totalFileCount,
 				float32(currentFileCount)*100/float32(totalFileCount))
 			os.Stdout.Sync()
+			rsClient := rs.New(&mac)
 			//worker
 			upCounter += 1
 			if upCounter%threadThreshold == 0 {
@@ -175,7 +193,18 @@ func QiniuUpload(threadCount int, uploadConfigFile string) {
 			upWorkGroup.Add(1)
 			go func() {
 				defer upWorkGroup.Done()
-
+				//check exists
+				if uploadConfig.CheckExists {
+					rsEntry, checkErr := rsClient.Stat(nil, uploadConfig.Bucket, uploadFileKey)
+					if checkErr != nil {
+						log.Error(fmt.Sprintf("Stat `%s' error due to `%s'", uploadFileKey, checkErr))
+						return
+					} else if rsEntry.Fsize == fsize {
+						log.Debug("File already exists in bucket, ignore this upload")
+						return
+					}
+				}
+				//upload
 				policy := rs.PutPolicy{}
 				policy.Scope = uploadConfig.Bucket
 				if uploadConfig.Overwrite {

@@ -218,6 +218,71 @@ func Prefetch(cmd string, params ...string) {
 	}
 }
 
+func BatchStat(cmd string, params ...string) {
+	if len(params) == 2 {
+		bucket := params[0]
+		keyListFile := params[1]
+		accountS.Get()
+		mac := digest.Mac{
+			accountS.AccessKey,
+			[]byte(accountS.SecretKey),
+		}
+		client := rs.New(&mac)
+		fp, err := os.Open(keyListFile)
+		if err != nil {
+			log.Error("Open key list file error", err)
+			return
+		}
+		defer fp.Close()
+		scanner := bufio.NewScanner(fp)
+		scanner.Split(bufio.ScanLines)
+		entries := make([]rs.EntryPath, 0)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			items := strings.Split(line, "\t")
+			if len(items) > 0 {
+				key := items[0]
+				if key != "" {
+					entry := rs.EntryPath{
+						bucket, key,
+					}
+					entries = append(entries, entry)
+				}
+			}
+			//check 1000 limit
+			if len(entries) == BATCH_ALLOW_MAX {
+				batchStat(client, entries)
+				//reset slice
+				entries = make([]rs.EntryPath, 0)
+			}
+		}
+		//stat the last batch
+		if len(entries) > 0 {
+			batchStat(client, entries)
+		}
+	} else {
+		CmdHelp(cmd)
+	}
+}
+
+func batchStat(client rs.Client, entries []rs.EntryPath) {
+	ret, err := qshell.BatchStat(client, entries)
+	if err != nil {
+		log.Error("Batch stat error", err)
+	}
+	if len(ret) > 0 {
+		for i, entry := range entries {
+			item := ret[i]
+			if item.Data.Error != "" {
+				fmt.Println(entry.Key + "\t" + item.Data.Error)
+			} else {
+				fmt.Println(fmt.Sprintf("%s\t%d\t%s\t%s\t%d", entry.Key,
+					item.Data.Fsize, item.Data.Hash, item.Data.MimeType, item.Data.PutTime))
+			}
+		}
+	}
+}
+
 func BatchDelete(cmd string, params ...string) {
 	if len(params) == 2 {
 		bucket := params[0]
@@ -241,7 +306,7 @@ func BatchDelete(cmd string, params ...string) {
 			line := strings.TrimSpace(scanner.Text())
 			items := strings.Split(line, "\t")
 			if len(items) > 0 {
-				key := strings.TrimSpace(items[0])
+				key := items[0]
 				if key != "" {
 					entry := rs.EntryPath{
 						bucket, key,
@@ -306,8 +371,8 @@ func BatchChgm(cmd string, params ...string) {
 			line := strings.TrimSpace(scanner.Text())
 			items := strings.Split(line, "\t")
 			if len(items) == 2 {
-				key := strings.TrimSpace(items[0])
-				mimeType := strings.TrimSpace(items[1])
+				key := items[0]
+				mimeType := items[1]
 				if key != "" && mimeType != "" {
 					entry := qshell.ChgmEntryPath{bucket, key, mimeType}
 					entries = append(entries, entry)
@@ -367,8 +432,8 @@ func BatchRename(cmd string, params ...string) {
 			line := strings.TrimSpace(scanner.Text())
 			items := strings.Split(line, "\t")
 			if len(items) == 2 {
-				oldKey := strings.TrimSpace(items[0])
-				newKey := strings.TrimSpace(items[1])
+				oldKey := items[0]
+				newKey := items[1]
 				if oldKey != "" && newKey != "" {
 					entry := qshell.RenameEntryPath{bucket, oldKey, newKey}
 					entries = append(entries, entry)
@@ -429,10 +494,10 @@ func BatchMove(cmd string, params ...string) {
 			line := strings.TrimSpace(scanner.Text())
 			items := strings.Split(line, "\t")
 			if len(items) == 1 || len(items) == 2 {
-				srcKey := strings.TrimSpace(items[0])
+				srcKey := items[0]
 				destKey := srcKey
 				if len(items) == 2 {
-					destKey = strings.TrimSpace(items[1])
+					destKey = items[1]
 				}
 				if srcKey != "" && destKey != "" {
 					entry := qshell.MoveEntryPath{srcBucket, destBucket, srcKey, destKey}
@@ -466,6 +531,73 @@ func batchMove(client rs.Client, entries []qshell.MoveEntryPath) {
 					entry.SrcBucket, entry.SrcKey, entry.DestBucket, entry.DestKey, item.Code))
 			} else {
 				log.Debug(fmt.Sprintf("Move '%s:%s' => '%s:%s' Success, Code :%d",
+					entry.SrcBucket, entry.SrcKey, entry.DestBucket, entry.DestKey, item.Code))
+			}
+		}
+	}
+}
+
+func BatchCopy(cmd string, params ...string) {
+	if len(params) == 3 {
+		srcBucket := params[0]
+		destBucket := params[1]
+		srcDestKeyMapFile := params[2]
+		accountS.Get()
+		mac := digest.Mac{
+			accountS.AccessKey,
+			[]byte(accountS.SecretKey),
+		}
+		client := rs.New(&mac)
+		fp, err := os.Open(srcDestKeyMapFile)
+		if err != nil {
+			log.Error("Open src dest key map file error")
+			return
+		}
+		defer fp.Close()
+		scanner := bufio.NewScanner(fp)
+		scanner.Split(bufio.ScanLines)
+		entries := make([]qshell.CopyEntryPath, 0)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			items := strings.Split(line, "\t")
+			if len(items) == 1 || len(items) == 2 {
+				srcKey := items[0]
+				destKey := srcKey
+				if len(items) == 2 {
+					destKey = items[1]
+				}
+				if srcKey != "" && destKey != "" {
+					entry := qshell.CopyEntryPath{srcBucket, destBucket, srcKey, destKey}
+					entries = append(entries, entry)
+				}
+			}
+			if len(entries) == BATCH_ALLOW_MAX {
+				batchCopy(client, entries)
+				entries = make([]qshell.CopyEntryPath, 0)
+			}
+		}
+		if len(entries) > 0 {
+			batchCopy(client, entries)
+		}
+		fmt.Println("All Copyed!")
+	} else {
+		CmdHelp(cmd)
+	}
+}
+
+func batchCopy(client rs.Client, entries []qshell.CopyEntryPath) {
+	ret, err := qshell.BatchCopy(client, entries)
+	if err != nil {
+		log.Error("Batch move error", err)
+	}
+	if len(ret) > 0 {
+		for i, entry := range entries {
+			item := ret[i]
+			if item.Data.Error != "" {
+				log.Error(fmt.Sprintf("Copy '%s:%s' => '%s:%s' Failed, Code :%d",
+					entry.SrcBucket, entry.SrcKey, entry.DestBucket, entry.DestKey, item.Code))
+			} else {
+				log.Debug(fmt.Sprintf("Copy '%s:%s' => '%s:%s' Success, Code :%d",
 					entry.SrcBucket, entry.SrcKey, entry.DestBucket, entry.DestKey, item.Code))
 			}
 		}
@@ -514,6 +646,49 @@ func Saveas(cmd string, params ...string) {
 		} else {
 			fmt.Println(url)
 		}
+	} else {
+		CmdHelp(cmd)
+	}
+}
+
+func M3u8Delete(cmd string, params ...string) {
+	if len(params) == 2 || len(params) == 3 {
+		bucket := params[0]
+		m3u8Key := params[1]
+		isPrivate := false
+		if len(params) == 3 {
+			isPrivate, _ = strconv.ParseBool(params[2])
+		}
+		accountS.Get()
+		mac := digest.Mac{
+			accountS.AccessKey,
+			[]byte(accountS.SecretKey),
+		}
+		m3u8FileList, err := qshell.M3u8FileList(&mac, bucket, m3u8Key, isPrivate)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		client := rs.New(&mac)
+		entryCnt := len(m3u8FileList)
+		if entryCnt == 0 {
+			log.Error("no m3u8 slices found")
+			return
+		}
+		if entryCnt <= BATCH_ALLOW_MAX {
+			batchDelete(client, m3u8FileList)
+		} else {
+			batchCnt := entryCnt / BATCH_ALLOW_MAX
+			for i := 0; i < batchCnt; i++ {
+				end := (i + 1) * BATCH_ALLOW_MAX
+				if end > entryCnt {
+					end = entryCnt
+				}
+				entriesToDelete := m3u8FileList[i*BATCH_ALLOW_MAX : end]
+				batchDelete(client, entriesToDelete)
+			}
+		}
+		fmt.Println("All deleted!")
 	} else {
 		CmdHelp(cmd)
 	}

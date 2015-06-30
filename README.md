@@ -7,19 +7,9 @@ qshell是利用[七牛文档上公开的API](http://d.qiniu.com)实现的一个�
 
 **建议下载最新版本**
 
-|版本     |支持平台|链接|
-|--------|---------|----|
-|qshell v1.0|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.0.zip)|
-|qshell v1.1|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.1.zip)|
-|qshell v1.2.1|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.2.1.zip)|
-|qshell v1.3|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.3.zip)|
-|qshell v1.3.1|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.3.1.zip)|
-|qshell v1.3.2|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.3.3.zip)|
-|qshell v1.3.3|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.3.3.zip)|
-|qshell v1.3.4|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.3.4.zip)|
-|qshell v1.3.6|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.3.6.zip)|
-|qshell v1.3.7|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.3.7.zip)|
-|qshell v1.3.8|Linux, Windows, Mac OSX|[下载](http://7rfgu2.com1.z0.glb.clouddn.com/qshell v1.3.8.zip)|
+|版本     |支持平台|链接|更新日志|
+|--------|---------|----|------|
+|qshell v1.4.4|Linux, Windows, Mac OSX|[下载](http://qdisk.qiniudn.com/qshell v1.4.4.zip)|[查看](CHANGELOG.md)|
 
 ###使用
 我们知道调用七牛的API需要一对`AccessKey`和`SecretKey`，这个可以从七牛的后台的账号设置->[密钥](https://portal.qiniu.com/setting/key)获取。
@@ -57,6 +47,10 @@ qshell account
 |fetch|从Internet上抓取一个资源到七牛空间中|[文档](http://github.com/jemygraw/qshell/wiki/fetch)|
 |prefetch|更新七牛空间中从源站镜像过来的文件|[文档](http://github.com/jemygraw/qshell/wiki/prefetch)|
 |batchdelete|批量删除七牛空间中的文件，可以直接根据`listbucket`的结果来删除|[文档](http://github.com/jemygraw/qshell/wiki/batchdelete)|
+|batchchgm|批量修改七牛空间中文件的MimeType|[文档](http://github.com/jemygraw/qshell/wiki/batchchgm)|
+|batchcopy|批量复制七牛空间中的文件到另一个空间|[文档](http://github.com/jemygraw/qshell/wiki/batchcopy)|
+|batchmove|批量移动七牛空间中的文件到另一个空间|[文档](http://github.com/jemygraw/qshell/wiki/batchmove)|
+|batchrename|批量重命名七牛空间中的文件|[文档](http://github.com/jemygraw/qshell/wiki/batchrename)|
 |checkqrsync|检查qrsync的同步结果，主要通过比对`dircache`和`listbucket`的结果|[文档](http://github.com/jemygraw/qshell/wiki/checkqrsync)|
 |b64encode|base64编码工具，可选是否使用UrlSafe方式，默认UrlSafe|[文档](http://github.com/jemygraw/qshell/wiki/b64encode)|
 |b64decode|base64解码工具，可选是否使用UrlSafe方式，默认UrlSafe|[文档](http://github.com/jemygraw/qshell/wiki/b64decode)|
@@ -70,8 +64,14 @@ qshell account
 |qetag|根据七牛的qetag算法来计算文件的hash|[文档](http://github.com/jemygraw/qshell/wiki/qetag)|
 |unzip|解压zip文件，支持UTF-8编码和GBK编码|[文档](http://github.com/jemygraw/qshell/wiki/unzip)|
 |privateurl|生成私有空间资源的访问外链|[文档](http://github.com/jemygraw/qshell/wiki/privateurl)|
+|saveas|实时处理的saveas链接快捷生成工具|[文档](http://github.com/jemygraw/qshell/wiki/saveas)|
+|reqid|七牛自定义头部X-Reqid解码工具|[文档](http://github.com/jemygraw/qshell/wiki/reqid)|
+|m3u8delete|根据流媒体播放列表文件删除七牛空间中的流媒体切片|[文档](http://github.com/jemygraw/qshell/wiki/m3u8delete)|
 
 ##编译
 1. 如果是编译本地平台的可执行程序，使用`src`目录下面的`build.sh`脚本即可。
 2. 如果是编译跨平台的可执行程序，使用`src`目录下面的`gox_build.sh`脚本即可。该脚本使用了[gox](https://github.com/mitchellh/gox)工具，请
 使用`go get github.com/mitchellh/gox`安装。
+
+##帮助
+如果您遇到任何问题，可以加QQ：2037014430，我将乐意帮助您，非技术问题勿扰。

@@ -5,10 +5,12 @@ import (
 	"os"
 )
 
-var version = "v1.3.9"
+var version = "v1.4.4"
 
 var optionDocs = map[string]string{
 	"-d": "Show debug message",
+	"-v": "Show version",
+	"-h": "Show help",
 }
 
 var cmds = []string{
@@ -28,7 +30,12 @@ var cmds = []string{
 	"chgm",
 	"fetch",
 	"prefetch",
+	"batchstat",
 	"batchdelete",
+	"batchchgm",
+	"batchcopy",
+	"batchmove",
+	"batchrename",
 	"checkqrsync",
 	"b64encode",
 	"b64decode",
@@ -44,6 +51,7 @@ var cmds = []string{
 	"privateurl",
 	"saveas",
 	"reqid",
+	"m3u8delete",
 }
 var cmdDocs = map[string][]string{
 	"account":       []string{"qshell [-d] account [<AccessKey> <SecretKey>]", "Get/Set AccessKey and SecretKey"},
@@ -51,8 +59,8 @@ var cmdDocs = map[string][]string{
 	"listbucket":    []string{"qshell [-d] listbucket <Bucket> [<Prefix>] <ListBucketResultFile>", "List all the file in the bucket by prefix"},
 	"alilistbucket": []string{"qshell [-d] alilistbucket <DataCenter> <Bucket> <AccessKeyId> <AccesskeySecret> [Prefix] <ListBucketResultFile>", "List all the file in the bucket of aliyun oss by prefix"},
 	"prefop":        []string{"qshell [-d] prefop <PersistentId>", "Query the fop status"},
-	"fput":          []string{"qshell [-d] fput <Bucket> <Key> <LocalFile> [MimeType]", "Form upload a local file"},
-	"rput":          []string{"qshell [-d] rput <Bucket> <Key> <LocalFile> [MimeType]", "Resumable upload a local file"},
+	"fput":          []string{"qshell [-d] fput <Bucket> <Key> <LocalFile> [MimeType] [UpHost]", "Form upload a local file"},
+	"rput":          []string{"qshell [-d] rput <Bucket> <Key> <LocalFile> [MimeType] [UpHost]", "Resumable upload a local file"},
 	"qupload":       []string{"qshell [-d] qupload [<ThreadCount>] <LocalUploadConfig>", "Batch upload files to the qiniu bucket"},
 	"qdownload":     []string{"qshell [-d] qdownload [<ThreadCount>] <LocalDownloadConfig>", "Batch download files from the qiniu bucket"},
 	"stat":          []string{"qshell [-d] stat <Bucket> <Key>", "Get the basic info of a remote file"},
@@ -62,8 +70,10 @@ var cmdDocs = map[string][]string{
 	"chgm":          []string{"qshell [-d] chgm <Bucket> <Key> <NewMimeType>", "Change the mimeType of a file"},
 	"fetch":         []string{"qshell [-d] fetch <RemoteResourceUrl> <Bucket> [<Key>]", "Fetch a remote resource by url and save in bucket"},
 	"prefetch":      []string{"qshell [-d] prefetch <Bucket> <Key>", "Fetch and update the file in bucket using mirror storage"},
+	"batchstat":     []string{"qshell [-d] batchstat <Bucket> <KeyListFile>", "Batch stat files in bucket"},
 	"batchdelete":   []string{"qshell [-d] batchdelete <Bucket> <KeyListFile>", "Batch delete files in bucket"},
 	"batchchgm":     []string{"qshell [-d] batchchgm <Bucket> <KeyMimeMapFile>", "Batch chgm files in bucket"},
+	"batchcopy":     []string{"qshell [-d] batchcopy <SrcBucket> <DestBucket> <SrcDestKeyMapFile>", "Batch copy files from bucket to bucket"},
 	"batchmove":     []string{"qshell [-d] batchmove <SrcBucket> <DestBucket> <SrcDestKeyMapFile>", "Batch move files from bucket to bucket"},
 	"batchrename":   []string{"qshell [-d] batchrename <Bucket> <OldNewKeyMapFile>", "Batch rename files in the bucket"},
 	"checkqrsync":   []string{"qshell [-d] checkqrsync <DirCacheResultFile> <ListBucketResultFile> <IgnoreLocalDir> [Prefix]", "Check the qrsync result"},
@@ -81,6 +91,11 @@ var cmdDocs = map[string][]string{
 	"privateurl":    []string{"qshell [-d] privateurl <PublicUrl> [<Deadline>]", "Create private resource access url"},
 	"saveas":        []string{"qshell [-d] saveas <PublicUrlWithFop> <SaveBucket> <SaveKey>", "Create a resource access url with fop and saveas"},
 	"reqid":         []string{"qshell [-d] reqid <ReqIdToDecode>", "Decode a qiniu reqid"},
+	"m3u8delete":    []string{"qshell [-d] m3u8delete <Bucket> <M3u8Key> [<IsPrivate>]", "Delete m3u8 playlist and the slices it references"},
+}
+
+func Version() {
+	fmt.Println("qshell", version)
 }
 
 func Help(cmd string, params ...string) {
