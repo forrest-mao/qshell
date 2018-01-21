@@ -1,2 +1,3 @@
-export GOPATH=$GOPATH:/Users/jemy/QiniuCloud/Projects/qshell
+DIR=$(cd ../; pwd)
+export GOPATH=$DIR:$GOPATH
 go build main.go

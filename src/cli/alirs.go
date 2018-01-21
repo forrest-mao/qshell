@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/qiniu/log"
+	"github.com/astaxie/beego/logs"
 	"qshell"
 )
 
@@ -28,8 +28,10 @@ func AliListBucket(cmd string, params ...string) {
 		}
 		err := aliListBucket.ListBucket(listBucketResultFile)
 		if err != nil {
-			log.Error("List bucket error,", err)
+			logs.Error("List bucket error,", err)
+			return
 		}
+		logs.Info("List bucket done!")
 	} else {
 		CmdHelp(cmd)
 	}

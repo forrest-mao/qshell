@@ -1,12 +1,13 @@
 package qshell
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/qiniu/log"
+	"github.com/astaxie/beego/logs"
 	"io/ioutil"
 	"os"
-	"os/user"
+	"path/filepath"
 )
 
 type Account struct {
@@ -14,75 +15,115 @@ type Account struct {
 	SecretKey string `json:"secret_key"`
 }
 
-func (this *Account) ToJson() (jsonStr string) {
-	jsonStr = ""
-	jsonData, err := json.Marshal(this)
-	if err != nil {
-		log.Error("Marshal account data failed.")
+func (acc *Account) ToJson() (jsonStr string, err error) {
+	jsonData, mErr := json.Marshal(acc)
+	if mErr != nil {
+		err = fmt.Errorf("Marshal account data error, %s", mErr)
 		return
 	}
 	jsonStr = string(jsonData)
-	return jsonStr
+	return
 }
 
-func (this *Account) String() string {
-	return fmt.Sprintf("AccessKey: %s SecretKey: %s", this.AccessKey, this.SecretKey)
+func (acc *Account) String() string {
+	return fmt.Sprintf("AccessKey: %s\nSecretKey: %s", acc.AccessKey, acc.SecretKey)
 }
 
-func (this *Account) Set(accessKey string, secretKey string) {
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Error("Get current user failed.", err)
+func SetAccount(accessKey string, secretKey string) (err error) {
+	accountFname := QAccountFile
+	if accountFname == "" {
+		storageDir := filepath.Join(QShellRootPath, ".qshell")
+		if _, sErr := os.Stat(storageDir); sErr != nil {
+			if mErr := os.MkdirAll(storageDir, 0755); mErr != nil {
+				err = fmt.Errorf("Mkdir `%s` error, %s", storageDir, mErr)
+				return
+			}
+		}
+
+		accountFname = filepath.Join(storageDir, "account.json")
+	}
+
+	accountFh, openErr := os.OpenFile(accountFname, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+	if openErr != nil {
+		err = fmt.Errorf("Open account file error, %s", openErr)
 		return
 	}
-	qAccountFolder := fmt.Sprintf("%s/%s", currentUser.HomeDir, ".qshell")
-	if _, err := os.Stat(qAccountFolder); err != nil {
-		if merr := os.MkdirAll(qAccountFolder, 0775); merr != nil {
-			log.Error(fmt.Sprintf("Mkdir `%s' failed.", qAccountFolder), merr)
+	defer accountFh.Close()
+
+	//encrypt ak&sk
+	aesKey := Md5Hex(accessKey)
+	encryptedSecretKeyBytes, encryptedErr := AesEncrypt([]byte(secretKey), []byte(aesKey[7:23]))
+	if encryptedErr != nil {
+		return encryptedErr
+	}
+	encryptedSecretKey := base64.URLEncoding.EncodeToString(encryptedSecretKeyBytes)
+
+	//write to local dir
+	var account Account
+	account.AccessKey = accessKey
+	account.SecretKey = encryptedSecretKey
+
+	jsonStr, mErr := account.ToJson()
+	if mErr != nil {
+		err = mErr
+		return
+	}
+
+	_, wErr := accountFh.WriteString(jsonStr)
+	if wErr != nil {
+		err = fmt.Errorf("Write account info error, %s", wErr)
+		return
+	}
+
+	return
+}
+
+func GetAccount() (account Account, err error) {
+	accountFname := QAccountFile
+	if accountFname == "" {
+		storageDir := filepath.Join(QShellRootPath, ".qshell")
+		accountFname = filepath.Join(storageDir, "account.json")
+	}
+
+	accountFh, openErr := os.Open(accountFname)
+	if openErr != nil {
+		err = fmt.Errorf("Open account file error, %s, please use `account` to set AccessKey and SecretKey first", openErr)
+		return
+	}
+	defer accountFh.Close()
+
+	accountBytes, readErr := ioutil.ReadAll(accountFh)
+	if readErr != nil {
+		err = fmt.Errorf("Read account file error, %s", readErr)
+		return
+	}
+
+	if umError := json.Unmarshal(accountBytes, &account); umError != nil {
+		err = fmt.Errorf("Parse account file error, %s", umError)
+		return
+	}
+
+	// backwards compatible with old version of qshell, which encrypt ak/sk based on existing ak/sk
+	if len(account.SecretKey) == 40 {
+		setErr := SetAccount(account.AccessKey, account.SecretKey)
+		if setErr != nil {
 			return
 		}
+	} else {
+		aesKey := Md5Hex(account.AccessKey)
+		encryptedSecretKeyBytes, decodeErr := base64.URLEncoding.DecodeString(account.SecretKey)
+		if decodeErr != nil {
+			err = decodeErr
+			return
+		}
+		secretKeyBytes, decryptErr := AesDecrypt([]byte(encryptedSecretKeyBytes), []byte(aesKey[7:23]))
+		if decryptErr != nil {
+			err = decryptErr
+			return
+		}
+		account.SecretKey = string(secretKeyBytes)
 	}
-	qAccountFile := fmt.Sprintf("%s/%s", qAccountFolder, "account.json")
-	log.Debug(fmt.Sprintf("Account file is `%s'", qAccountFile))
-	fp, openErr := os.OpenFile(qAccountFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
-	if openErr != nil {
-		log.Error("Open account file failed.", openErr)
-		return
-	}
-	this.AccessKey = accessKey
-	this.SecretKey = secretKey
-	account := Account{
-		AccessKey: accessKey,
-		SecretKey: secretKey,
-	}
-	_, wErr := fp.WriteString(account.ToJson())
-	if wErr != nil {
-		log.Error("Write account info failed.", wErr)
-		return
-	}
-	fp.Close()
-}
 
-func (this *Account) Get() {
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Error("Get current user failed.", err)
-		return
-	}
-	qAccountFile := fmt.Sprintf("%s/%s/%s", currentUser.HomeDir, ".qshell", "account.json")
-	fp, openErr := os.Open(qAccountFile)
-	if openErr != nil {
-		log.Error("Open account file failed.", openErr)
-		return
-	}
-	defer fp.Close()
-	accountBytes, readErr := ioutil.ReadAll(fp)
-	if readErr != nil {
-		log.Error("Read account file error.", readErr)
-		return
-	}
-	if umError := json.Unmarshal(accountBytes, this); umError != nil {
-		log.Error("Parse account file error.", umError)
-		return
-	}
+	logs.Info("Load account from %s", accountFname)
+	return
 }

@@ -5,22 +5,36 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
-	"github.com/qiniu/api/auth/digest"
-	"github.com/qiniu/api/conf"
-	"github.com/qiniu/api/rs"
 	"net/url"
+	"qiniu/api.v6/auth/digest"
+	"qiniu/api.v6/conf"
+	"qiniu/api.v6/rs"
 	"strings"
 )
 
 type FetchResult struct {
-	Key  string `json:"key"`
-	Hash string `json:"hash"`
+	Key      string `json:"key"`
+	Hash     string `json:"hash"`
+	MimeType string `json:"mimeType"`
+	Fsize    int64  `json:"fsize"`
 }
 
 type ChgmEntryPath struct {
 	Bucket   string
 	Key      string
 	MimeType string
+}
+
+type ChtypeEntryPath struct {
+	Bucket   string
+	Key      string
+	FileType int
+}
+
+type DeleteAfterDaysEntryPath struct {
+	Bucket          string
+	Key             string
+	DeleteAfterDays int
 }
 
 type RenameEntryPath struct {
@@ -54,10 +68,11 @@ type BatchItemRetData struct {
 	MimeType string `json:"mimeType,omitempty"`
 	PutTime  int64  `json:"putTime,omitempty"`
 	Error    string `json:"error,omitempty"`
+	FileType int    `json:"type"`
 }
 
 func Fetch(mac *digest.Mac, remoteResUrl, bucket, key string) (fetchResult FetchResult, err error) {
-	client := rs.New(mac)
+	client := rs.NewMac(mac)
 	entry := bucket
 	if key != "" {
 		entry += ":" + key
@@ -70,16 +85,22 @@ func Fetch(mac *digest.Mac, remoteResUrl, bucket, key string) (fetchResult Fetch
 }
 
 func Prefetch(mac *digest.Mac, bucket, key string) (err error) {
-	client := rs.New(mac)
+	client := rs.NewMac(mac)
 	prefetchUri := fmt.Sprintf("/prefetch/%s", base64.URLEncoding.EncodeToString([]byte(bucket+":"+key)))
 	err = client.Conn.Call(nil, nil, conf.IO_HOST+prefetchUri)
 	return
 }
 
-func PrivateUrl(mac *digest.Mac, publicUrl string, deadline int64) string {
+func PrivateUrl(mac *digest.Mac, publicUrl string, deadline int64) (finalUrl string, err error) {
+	srcUri, pErr := url.Parse(publicUrl)
+	if pErr != nil {
+		err = pErr
+		return
+	}
+
 	h := hmac.New(sha1.New, mac.SecretKey)
 
-	urlToSign := publicUrl
+	urlToSign := srcUri.String()
 	if strings.Contains(publicUrl, "?") {
 		urlToSign = fmt.Sprintf("%s&e=%d", urlToSign, deadline)
 	} else {
@@ -89,8 +110,8 @@ func PrivateUrl(mac *digest.Mac, publicUrl string, deadline int64) string {
 
 	sign := base64.URLEncoding.EncodeToString(h.Sum(nil))
 	token := mac.AccessKey + ":" + sign
-	url := fmt.Sprintf("%s&token=%s", urlToSign, token)
-	return url
+	finalUrl = fmt.Sprintf("%s&token=%s", urlToSign, token)
+	return
 }
 
 func Saveas(mac *digest.Mac, publicUrl string, saveBucket string, saveKey string) (string, error) {
@@ -127,6 +148,24 @@ func BatchChgm(client rs.Client, entries []ChgmEntryPath) (ret []BatchItemRet, e
 	return
 }
 
+func BatchChtype(client rs.Client, entries []ChtypeEntryPath) (ret []BatchItemRet, err error) {
+	b := make([]string, len(entries))
+	for i, e := range entries {
+		b[i] = rs.URIChangeType(e.Bucket, e.Key, e.FileType)
+	}
+	err = client.Batch(nil, &ret, b)
+	return
+}
+
+func BatchDeleteAfterDays(client rs.Client, entries []DeleteAfterDaysEntryPath) (ret []BatchItemRet, err error) {
+	b := make([]string, len(entries))
+	for i, e := range entries {
+		b[i] = rs.URIDeleteAfterDays(e.Bucket, e.Key, e.DeleteAfterDays)
+	}
+	err = client.Batch(nil, &ret, b)
+	return
+}
+
 func BatchDelete(client rs.Client, entries []rs.EntryPath) (ret []BatchItemRet, err error) {
 	b := make([]string, len(entries))
 	for i, e := range entries {
@@ -136,28 +175,28 @@ func BatchDelete(client rs.Client, entries []rs.EntryPath) (ret []BatchItemRet, 
 	return
 }
 
-func BatchRename(client rs.Client, entries []RenameEntryPath) (ret []BatchItemRet, err error) {
+func BatchRename(client rs.Client, entries []RenameEntryPath, force bool) (ret []BatchItemRet, err error) {
 	b := make([]string, len(entries))
 	for i, e := range entries {
-		b[i] = rs.URIMove(e.Bucket, e.OldKey, e.Bucket, e.NewKey)
+		b[i] = rs.URIMove(e.Bucket, e.OldKey, e.Bucket, e.NewKey, force)
 	}
 	err = client.Batch(nil, &ret, b)
 	return
 }
 
-func BatchMove(client rs.Client, entries []MoveEntryPath) (ret []BatchItemRet, err error) {
+func BatchMove(client rs.Client, entries []MoveEntryPath, force bool) (ret []BatchItemRet, err error) {
 	b := make([]string, len(entries))
 	for i, e := range entries {
-		b[i] = rs.URIMove(e.SrcBucket, e.SrcKey, e.DestBucket, e.DestKey)
+		b[i] = rs.URIMove(e.SrcBucket, e.SrcKey, e.DestBucket, e.DestKey, force)
 	}
 	err = client.Batch(nil, &ret, b)
 	return
 }
 
-func BatchCopy(client rs.Client, entries []CopyEntryPath) (ret []BatchItemRet, err error) {
+func BatchCopy(client rs.Client, entries []CopyEntryPath, force bool) (ret []BatchItemRet, err error) {
 	b := make([]string, len(entries))
 	for i, e := range entries {
-		b[i] = rs.URICopy(e.SrcBucket, e.SrcKey, e.DestBucket, e.DestKey)
+		b[i] = rs.URICopy(e.SrcBucket, e.SrcKey, e.DestBucket, e.DestKey, force)
 	}
 	err = client.Batch(nil, &ret, b)
 	return
