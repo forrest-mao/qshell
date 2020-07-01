@@ -8,21 +8,23 @@
 # 格式
 
 ```
-qshell qdownload [<ThreadCount>] <LocalDownloadConfig>
+qshell qdownload [-c <ThreadCount>] <LocalDownloadConfig>
 ```
 
 # 鉴权
 
-需要在使用了`account`设置了`AccessKey`和`SecretKey`的情况下使用。
+需要在使用了`account`设置了`AccessKey`, `SecretKey`和`Name`的情况下使用。
 
 # 参数
 
 |参数名称|描述|可选参数|取值范围|
 |----------|-----------|----------|---------|
-|ThreadCount|下载的并发协程数量|Y|1-2000，如果不在这个范围内，默认为5|
 |LocalDownloadConfig|本地下载的配置文件，内容包括要下载的文件所在空间，文件前缀等信息，具体参考配置文件说明|N||
 
-其中 `ThreadCount` 表示支持同时下载多个文件。
+其中 `ThreadCount** 表示支持同时下载多个文件。
+
+**c选项**
+-c ThreadCount ==> 下载的并发协程数量, 大小必须在1-2000，如果不在这个范围内，默认为5
 
 # 配置【该功能默认需要计费，如果希望享受10G的免费流量，请自行设置cdn_domain参数，如不设置，需支付源站流量费用，无法减免！！！】
 
@@ -64,13 +66,13 @@ qshell qdownload [<ThreadCount>] <LocalDownloadConfig>
 
 # 示例 【该功能默认需要计费，如果希望享受10G的免费流量，请自行设置cdn_domain参数，如不设置，需支付源站流量费用，无法减免！！！】
 
-需要同步空间`qdisk`中的所有以`movies/`开头，并以`.mp4`结尾的文件到本地路径`/Users/jemy/Temp7/backup`下面：
+需要同步空间`qdisk`中的所有以`movies/`开头(理解为前缀的概念，那么movies/1.mp4,movies/2.mp4等以movies/为前缀的文件都会被下载保存)，并以`.mp4`结尾的文件到本地路径`/Users/jemy/Temp7/backup`下面（把下面的配置内容写入配置文件qdisk_down.conf，该配置文件需要自行创建）：
 
 ```
 {
 	"dest_dir"	:	"/Users/jemy/Temp7/backup",
 	"bucket"	:	"qdisk",
-	"cdn_domain":    :      "if-pbl.qiniudn.com",
+	"cdn_domain"    :      "if-pbl.qiniudn.com",
 	"prefix"	:	"movies/",
 	"suffixes"	:	".mp4"
 }
@@ -79,5 +81,5 @@ qshell qdownload [<ThreadCount>] <LocalDownloadConfig>
 运行命令（下载并发数表示可以同时下载10个文件）：
 
 ```
-qshell qdownload 10 qdisk_down.conf
+qshell qdownload -c 10 qdisk_down.conf
 ```

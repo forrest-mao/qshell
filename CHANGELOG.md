@@ -1,3 +1,74 @@
+# 2.4.0 
+1. 添加batchdelete 自定义分隔符
+2. batchfetch支持自定义上传Host设置
+3. 添加awsfetch抓取亚马逊空间数据到七牛空间
+4. 添加awslist列举亚马逊空间文件
+5. 添加了异步抓取命令abfetch
+
+# 2.3.7
+1. 加入forbidden命令，可以禁用或者解禁文件
+2. pfop加入pipeline, 和上传回调
+3. 修复batchfetch bug
+
+# 2.3.6
+1. 修复m3u8replace 上传的问题
+2. 加入reportCard检测代码质量
+
+# 2.3.5
+1. 增加token命令，创建Qbox token, qiniuToken, uploadToken
+2. qshell配置文件支持设置accessKey和secretKey
+3. 增加了arm版本
+4. listbucket2增加文件大小的可读性，可以使用Bytes, KB, MB, GB格式显示
+
+# 2.3.4
+1. listbucket2增加捕捉interrupt信号(CTR-C), 打印marker
+2. account在本地记录账号，默认不覆盖, 加了-w强制覆盖选项 
+3. listbucket2 增加append 模式（-a)开启, 修复列举几亿空间的时候，列举一半左右程序中断问题
+4. 修复dircache 列表没有输出到文件使用-o选项的时候
+5. 修复qupload, qupload2使用多线程上传导致的部分文件上传失败问题
+6. 加了-L 选项到qshell, 使用当前工作路径作为qshell的配置目录
+
+# 2.3.3
+1. 修复qdownload配置cdn_domain使用了测试域名作为HOST 引起超过10G流量限制的问题
+2. listbucket2 max-retry选项只限制出错下载次数，不限制接口返回空的次数
+3. 修复cdnprefetch, cdnrefresh中的bug
+4. 增加rput, fput, qupload的设置callbackurl, callbackhost的支持
+
+# 2.3.2
+1. 修复fetch incorrect region
+2. 修复docs中文档格式显示问题
+3. 给listbucket2添加不限制重试次数的功能
+
+# 2.3.1
+1. batchdelete, batchchgm, batchchtype, batchmove, batchrename命令运行可导出失败，成功文件列表
+2. rput, fput, qupload上传支持设置回调用 
+3. 修复qdownload, qupload 配置文件Windows下UTF-8 BOM解码出错问题
+
+# 2.3.0
+1. 重构qshell代码，方便后续合并qrsctl, qfetch，和添加新的功能
+2. 加入了user命令， 多用户管理，可以在多个用户之间切换
+3. 加入了命令pfop, 命令行提交音视频的处理
+4. get 命令，这个是移植qrsctl get的命令的，下载文件
+5. 增加了包依赖管理，（go1.11以上）
+6. 加入了命令行自动补全， 用户切换时候用户名字的补全
+7. 增加了默认读取家目录下.qshell.json格式的配置文件，这样对于通用的配置，可以不用每次都要命令行提供配置文件
+8. 修改了命令行接口行为, 选项是以"-"开头的后跟一个字母， 长选项--开头, 对于没有提供配置文件的命令行，默认从标准输入读取内容
+
+# 2.2.1
+1. 为qdownload增加file_encoding参数用来支持windows下的gbk编码
+2. 为qupload增加file_encoding参数用来支持windows下的gbk编码
+
+# 2.2.0
+1. 增加get命令直接从源站下载文件
+2. 增加listbucket2命令支持流式获取空间文件列表
+
+# 2.1.9
+1. 增加获取授权空间域名的功能
+
+# 2.1.8
+1. 增加新加坡机房的支持
+2. 全平台使用原生平台支持
+
 # 2.1.7
 1. 增加`rpcdecode`功能，用来解码qiniu编码参数，支持按行解码
 2. 增加`rpcencode`功能，用来支持qiniu编码

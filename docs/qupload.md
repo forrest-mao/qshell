@@ -5,23 +5,42 @@
 # 格式
 
 ```
-qshell qupload [<ThreadCount>] <LocalUploadConfig>
+qshell qupload [-c <ThreadCount>] [--sucess-list <SuccessFileName>] [--failure-list <FailureFileName>] [--overwrite-list <OverFileName>] [--callback-urls <CallbackUrls>] [--callback-host <CallbackHost>]
+<LocalUploadConfig>
 ```
 
 # 鉴权
 
-需要在使用了`account`设置了`AccessKey`和`SecretKey`的情况下使用。
+需要在使用了`account`设置了`AccessKey`, `SecretKey`和`Name`的情况下使用。
 
 # 参数
 
 |参数名|描述|可选参数|
 |-----------|--------------------------|-----|
-|ThreadCount|并发上传的协程数量，默认为1，即文件一个个上传，对于大量小文件来说，可以通过提高该参数值来提升同步速度|Y|
 |LocalUploadConfig|数据同步的配置文件，该配置文件里面包含了一些诸如本地同步目录，目标空间名称等信息，详情参考配置文件的讲解|N|
 
-关于 `ThreadCount` 的值，并不是越大越好，所以工具里面限制了范围 [1, 2000]，在实际情况下最好根据所拥有的上传带宽和文件的平均大小来计算下这个并发数，最简单的算法就是带宽除以平均文件大小即可得到并发数。
+**c选项**
+ThreadCount ==> 并发上传的协程数量，默认为1，即文件一个个上传，对于大量小文件来说，可以通过提高该参数值来提升同步速度
+
+关于 `ThreadCount` 的值，并不是越大越好，所以工具里面限制了范围 [1, 2000**，在实际情况下最好根据所拥有的上传带宽和文件的平均大小来计算下这个并发数，最简单的算法就是带宽除以平均文件大小即可得到并发数。
 
 假设上传带宽有10Mbps，文件平均大小500KB，那么利用 10*1024/8/500 = 2.56，那么并发数差不多就是 3-6 左右。
+
+**success-list选项**
+接受一个文件名字，导入上传成功的文件列表到该文件
+
+**failure-list选项**
+接受一个文件名字， 导入上传失败的文件列表到该文件
+
+**overwrite-list选项**
+接受一个文件名字， 导入存储空间中被覆盖的文件列表到该文件
+
+**callback-urls选项**
+指定上传回调的地址，可以指定多个地址，以逗号分开
+
+**callback-host选项**
+上传回调HOST， 必须和CallbackUrls一起指定
+
 
 # 配置
 
@@ -55,7 +74,7 @@ qshell qupload [<ThreadCount>] <LocalUploadConfig>
 
 |参数名|描述|可选参数|
 |-----------|------------|------------|
-|src_dir|本地同步路径，为全路径格式，工具将同步该目录下面所有的文件；在Windows系统下面使用的时候，注意`src_dir`的设置遵循`D:\\jemy\\backup`这种方式。也就是路径里面的`\`要有两个（`\\`）|N|
+|src_dir|本地同步路径，为全路径格式，工具将同步该目录下面所有的文件；不支持本地路径下的目录软连接。在Windows系统下面使用的时候，注意`src_dir`的设置遵循`D:\\jemy\\backup`这种方式。也就是路径里面的`\`要有两个（`\\`）|N|
 |bucket|同步数据的目标空间名称，可以为公开空间或私有空间|N|
 |file_list|待同步文件列表，该文件列表内容必须是相对于`src_dir`的文件相对路径列表，可以不指定，工具将自动获取`src_dir`下面的文件列表。请使用 `dircache` 命令生成这个文件列表，生成之后可以手动删除不需要的行|Y|
 |up_host|上传域名，可选设置，一般情况下不需要指定|Y|
@@ -168,7 +187,7 @@ Skip upload of changed file `xxx` but no overwrite set
 
 `overwrite` 这个参数设置为 `true` 的时候，覆盖操作会在两种情况下发生：
 
-（1）本地文件的最后修改时间发生了改变（认为该文件内容已变化），并且在设置了 `rescal_local` 为 `true` 的情况下；
+（1）本地文件的最后修改时间发生了改变（认为该文件内容已变化），并且在设置了 `rescan_local` 为 `true` 的情况下；
 
 （2）当开启了 `check_exists` 选项，发现空间已存在同名文件，而且在 `check_hash` 或者 `check_size` 发现文件内容hash或者大小不同的情况下；
 
@@ -308,7 +327,7 @@ demo2.gif
 命令格式：
 
 ```
-$ qshell qupload -success-list success.txt upload.conf 
+$ qshell qupload --success-list success.txt upload.conf 
 ```
 特别提示：由于这些选项所指定的文件在每次运行命令时，如果文件已存在，则已有内容会被清空然后写入新的内容，所以注意每次命令运行指定不同的文件。
 

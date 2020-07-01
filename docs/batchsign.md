@@ -5,7 +5,7 @@
 # 格式
 
 ```
-qshell batchsign <UrlListFile> [<Deadline>]
+qshell batchsign [<-i UrlListFile>] [-e <Deadline>]
 ```
 
 # 鉴权
@@ -14,10 +14,11 @@ qshell batchsign <UrlListFile> [<Deadline>]
 
 # 参数
 
-|参数名|描述|可选参数|
-|---------|-----------|---|
-|UrlListFile|资源的公开访问外链列表，每行一个公开访问链接|N|
-|Deadline|生成的私有访问外链的过期时间戳，如果不设置默认为一年有效期|Y|
+**i短选项**
+接受一个文件参数, 内容是要签名的地址列表。如果没有指定该文件，默认从标准输入读取内容。
+
+**e短选项**
+接受一个过时的deadline参数，如果没有指定该参数，默认为3600s 
 
 # 示例
 
@@ -31,7 +32,7 @@ http://if-pri.qiniudn.com/camera.jpg?imageView2/0/w/100
 使用
 
 ```
-$ qshell batchsign tosign.txt
+$ qshell batchsign -i tosign.txt
 ```
 
 就能生成私有外链：
@@ -44,7 +45,10 @@ http://if-pri.qiniudn.com/camera.jpg?imageView2/0/w/100&e=1473840685&token=TQt-i
 或者指定外链的有效期时间戳：
 
 ```
-$ qshell batchsign tosign.txt 1473840685
+$ qshell batchsign -i tosign.txt -e 1473840685
 ```
 
 这个时间戳可以用`d2ts`命令来生成。
+
+# 注意
+如果没有指定输入文件，默认从标准输入读取内容

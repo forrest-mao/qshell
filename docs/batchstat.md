@@ -5,19 +5,21 @@
 # 格式
 
 ```
-qshell batchstat <Bucket> <KeyListFile>
+qshell batchstat <Bucket> <-i KeyListFile>
 ```
 
 # 鉴权
 
-需要在使用了`account`设置了`AccessKey`和`SecretKey`的情况下使用。
+需要在使用了`account`设置了`AccessKey`, `SecretKey`和`Name`的情况下使用。
 
 # 参数
 
 |参数名|描述|
 |---------|-----------|
 |Bucket|空间名，可以为公开空间或私有空间|
-|KeyListFile|待查询文件名列表，按行分隔|
+
+**i短选项**
+接受一个文件参数，内容为要stat的文件列表, 按行分隔。如果没有指定，从标准输入读取内容。
 
 
 # 示例
@@ -37,7 +39,7 @@ RclviFDHaQAUl3aL46jKRskUWbg=/FpwH76F3yfYmFKoPDjoSNWzeLKYp/000005.ts
 - 使用如下命令进行批量查询
 
 ```
-$ qshell batchmove 7qiniu listFile
+$ qshell batchstat 7qiniu -i listFile
 ```
 
 - 输出 Key、Fsize、Hash、MimeType、PutTime 以`\t`分隔：
@@ -51,3 +53,6 @@ RclviFDHaQAUl3aL46jKRskUWbg=/FpwH76F3yfYmFKoPDjoSNWzeLKYp/000004.ts 92308   FkYN
 RclviFDHaQAUl3aL46jKRskUWbg=/FpwH76F3yfYmFKoPDjoSNWzeLKYp/000005.ts 92120   Fh4Fwhu3dMUGbd3jE5OmRtfVZLv4    video/mp2t  15003760423842522
 ```
 
+# 注意
+
+如果没有指定输入文件， 默认从标准输入读取内容
